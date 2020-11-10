@@ -1,0 +1,30 @@
+build:docker:
+  image: docker
+  services:
+    - docker:dind
+  script:
+    - docker version
+    - docker info
+    - docker login -u gitlab-ci-token -p $CI_BUILD_TOKEN $CI_REGISTRY
+
+    # build and push as :ci-$CI_COMMIT_REF_SLUG
+    - |
+      function build()
+      {
+        docker build "$@" -t $CI_REGISTRY_IMAGE:ci-$CI_COMMIT_REF_SLUG .
+      }
+
+      if docker pull $CI_REGISTRY_IMAGE:ci-$CI_COMMIT_REF_SLUG
+      then
+        build --cache-from=$CI_REGISTRY_IMAGE:ci-$COMMIT_REF_SLUG
+      elif docker pull $CI_REGISTRY_IMAGE:ci-cache
+      then
+        build --cache-from=$CI_REGISTRY_IMAGE:ci-cache
+      else
+        build
+      fi
+    - docker push $CI_REGISTRY_IMAGE:ci-$CI_COMMIT_REF_SLUG
+
+    # tag and push as :ci-cache
+    - docker image tag $CI_REGISTRY_IMAGE:ci-$CI_COMMIT_REF_SLUG $CI_REGISTRY_IMAGE:ci-cache
+    - docker push $CI_REGISTRY_IMAGE:ci-cache
